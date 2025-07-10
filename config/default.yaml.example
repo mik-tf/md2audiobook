@@ -1,0 +1,334 @@
+# md2audiobook Default Configuration
+# Professional Markdown to Audiobook Pipeline
+
+# =============================================================================
+# PROCESSING CONFIGURATION
+# =============================================================================
+processing:
+  # Processing mode: basic, local_ai, api, hybrid
+  mode: "hybrid"
+  
+  # Enable parallel processing
+  parallel: true
+  
+  # Number of worker threads
+  workers: 4
+  
+  # Enable caching for processed content
+  cache_enabled: true
+  
+  # Cache directory
+  cache_dir: ".cache"
+
+# =============================================================================
+# DOCUMENT PROCESSING
+# =============================================================================
+markdown:
+  # Preserve emphasis markers for voice modulation
+  preserve_emphasis: true
+  
+  # Extract and process LaTeX math expressions
+  extract_math: true
+  
+  # Chapter detection method: headers, frontmatter, auto
+  chapter_detection: "headers"
+  
+  # Header levels to treat as chapters (## = h2, ### = h3)
+  chapter_levels: [2, 3]
+  
+  # Process footnotes and citations
+  process_citations: true
+  
+  # Handle code blocks specially
+  process_code_blocks: true
+
+# =============================================================================
+# TEXT ENHANCEMENT
+# =============================================================================
+text_enhancement:
+  # Enhancement mode: template, local_ai, api
+  mode: "local_ai"
+  
+  # Mathematical expression processing
+  math_processing:
+    enabled: true
+    # Convert LaTeX to spoken form
+    latex_to_speech: true
+    # Voice to use for math expressions
+    math_voice: "technical_clear"
+    # Pauses around math expressions (seconds)
+    pause_before: 1.5
+    pause_after: 1.0
+  
+  # Citation and reference handling
+  citation_handling:
+    enabled: true
+    # Convert "(Author, Year)" to natural speech
+    naturalize_citations: true
+    # Voice for citations
+    citation_voice: "secondary_narrator"
+  
+  # Technical term pronunciation
+  technical_terms:
+    # Use custom pronunciation dictionary
+    use_dictionary: true
+    # Dictionary file path
+    dictionary_file: "config/pronunciation_dictionary.yaml"
+  
+  # AI enhancement settings
+  ai_enhancement:
+    # Local AI model (Ollama)
+    local_model: "llama2:7b"
+    # API model for premium enhancement
+    api_model: "gpt-3.5-turbo"
+    # Enhancement prompt template
+    prompt_template: "academic_optimization"
+
+# =============================================================================
+# AUDIO GENERATION
+# =============================================================================
+audio:
+  # Output format: m4b, mp3, wav
+  output_format: "m4b"
+  
+  # Audio quality: low, medium, high
+  quality: "high"
+  
+  # Sample rate (Hz)
+  sample_rate: 44100
+  
+  # Number of channels: 1 (mono), 2 (stereo)
+  channels: 2
+  
+  # Bitrate for compressed formats (kbps)
+  bitrate: 128
+  
+  # Enable audio post-processing
+  post_processing:
+    enabled: true
+    # Normalize audio levels
+    normalize: true
+    # Remove silence at beginning/end
+    trim_silence: true
+    # Add fade in/out
+    fade_duration: 0.5
+
+# =============================================================================
+# VOICE CONFIGURATION
+# =============================================================================
+voices:
+  # Main narrator voice
+  main_narrator:
+    provider: "piper"  # piper, elevenlabs, azure, google
+    voice_id: "en_US-lessac-medium"
+    speed: 1.0
+    pitch: 1.0
+    emphasis: 1.1
+    
+  # Chapter header voice
+  chapter_voice:
+    provider: "piper"
+    voice_id: "en_US-lessac-medium"
+    speed: 0.9
+    pitch: 1.1
+    emphasis: 1.3
+    pause_after: 2.0
+    
+  # Mathematical expression voice
+  math_voice:
+    provider: "piper"
+    voice_id: "en_US-lessac-medium"
+    speed: 0.8  # Slower for clarity
+    pitch: 0.95
+    emphasis: 1.0
+    pause_before: 1.5
+    pause_after: 1.0
+    
+  # Secondary voice for footnotes/citations
+  secondary_voice:
+    provider: "piper"
+    voice_id: "en_US-lessac-medium"
+    speed: 0.95
+    pitch: 0.9
+    emphasis: 0.9
+    
+  # Code block voice
+  code_voice:
+    provider: "piper"
+    voice_id: "en_US-lessac-medium"
+    speed: 0.85
+    pitch: 0.85
+    emphasis: 0.8
+
+# =============================================================================
+# TTS PROVIDER SETTINGS
+# =============================================================================
+tts_providers:
+  # Piper TTS (Local)
+  piper:
+    enabled: true
+    model_dir: "models/piper"
+    default_voice: "en_US-lessac-medium"
+    
+  # ElevenLabs (API)
+  elevenlabs:
+    enabled: false  # Requires API key
+    api_key: "${ELEVENLABS_API_KEY}"
+    default_voice: "21m00Tcm4TlvDq8ikWAM"
+    model: "eleven_monolingual_v1"
+    
+  # Azure Cognitive Services (API)
+  azure:
+    enabled: false  # Requires API key
+    api_key: "${AZURE_SPEECH_KEY}"
+    region: "${AZURE_SPEECH_REGION}"
+    default_voice: "en-US-AriaNeural"
+    
+  # Google Cloud TTS (API)
+  google:
+    enabled: false  # Requires credentials
+    credentials_file: "${GOOGLE_APPLICATION_CREDENTIALS}"
+    default_voice: "en-US-Wavenet-D"
+    language_code: "en-US"
+
+# =============================================================================
+# AI PROVIDER SETTINGS
+# =============================================================================
+ai_providers:
+  # Ollama (Local AI)
+  ollama:
+    enabled: true
+    host: "http://localhost:11434"
+    default_model: "llama2:7b"
+    timeout: 30
+    
+  # OpenAI (API)
+  openai:
+    enabled: false  # Requires API key
+    api_key: "${OPENAI_API_KEY}"
+    default_model: "gpt-3.5-turbo"
+    max_tokens: 2000
+    
+  # Anthropic Claude (API)
+  anthropic:
+    enabled: false  # Requires API key
+    api_key: "${ANTHROPIC_API_KEY}"
+    default_model: "claude-3-sonnet-20240229"
+    max_tokens: 2000
+
+# =============================================================================
+# OUTPUT CONFIGURATION
+# =============================================================================
+output:
+  # Output directory
+  directory: "output"
+  
+  # Subdirectories for different output types
+  audiobooks_dir: "audiobooks"
+  enhanced_text_dir: "enhanced_text"
+  temp_dir: "temp"
+  
+  # File naming pattern
+  # Available variables: {title}, {author}, {date}, {format}
+  filename_pattern: "{title}_{author}_{date}.{format}"
+  
+  # Metadata embedding
+  embed_metadata:
+    enabled: true
+    # Include chapter markers
+    chapter_markers: true
+    # Include cover art (if available)
+    cover_art: true
+
+# =============================================================================
+# QUALITY ASSURANCE
+# =============================================================================
+quality:
+  # Validation settings
+  validation:
+    enabled: true
+    # Check audio quality
+    audio_validation: true
+    # Verify chapter markers
+    chapter_validation: true
+    # Validate metadata
+    metadata_validation: true
+    
+  # Error handling
+  error_handling:
+    # Continue processing on non-critical errors
+    continue_on_error: true
+    # Maximum number of retries
+    max_retries: 3
+    # Retry delay (seconds)
+    retry_delay: 5
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  level: "INFO"
+  
+  # Log file path
+  file: "logs/md2audiobook.log"
+  
+  # Enable console output
+  console: true
+  
+  # Log format
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  
+  # Enable performance logging
+  performance: true
+
+# =============================================================================
+# ACADEMIC CONTENT SPECIFIC SETTINGS
+# =============================================================================
+academic:
+  # Mathematical notation handling
+  math:
+    # Symbol pronunciation dictionary
+    symbols:
+      "∑": "sum"
+      "∫": "integral"
+      "∂": "partial derivative"
+      "≈": "approximately equals"
+      "≠": "not equal to"
+      "≤": "less than or equal to"
+      "≥": "greater than or equal to"
+      "∞": "infinity"
+      "π": "pi"
+      "α": "alpha"
+      "β": "beta"
+      "γ": "gamma"
+      "δ": "delta"
+      "ε": "epsilon"
+      "θ": "theta"
+      "λ": "lambda"
+      "μ": "mu"
+      "σ": "sigma"
+      "φ": "phi"
+      "ψ": "psi"
+      "ω": "omega"
+      
+  # Citation formats
+  citations:
+    # Common academic citation patterns
+    patterns:
+      - "\\(([A-Za-z]+),\\s*(\\d{4})\\)"  # (Author, Year)
+      - "\\[([A-Za-z]+)\\s+(\\d{4})\\]"   # [Author Year]
+      
+  # Technical term pronunciation
+  terminology:
+    physics:
+      "EPR": "E P R"
+      "Bell's Theorem": "Bell's Theorem"
+      "quantum mechanics": "quantum mechanics"
+      "entanglement": "entanglement"
+      "superposition": "superposition"
+    mathematics:
+      "eigenvalue": "eigen value"
+      "eigenvector": "eigen vector"
+      "Hilbert space": "Hilbert space"
+      "Hermitian": "Hermitian"
