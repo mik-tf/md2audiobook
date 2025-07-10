@@ -10,7 +10,7 @@ from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
 import requests
 import json
-from .markdown_processor import DocumentStructure, MathExpression, Citation
+from markdown_processor import DocumentStructure, MathExpression, Citation
 
 
 @dataclass
@@ -21,6 +21,7 @@ class EnhancedText:
     pause_markers: List[Tuple[int, float]]  # (position, duration)
     pronunciation_guides: Dict[str, str]  # term -> pronunciation
     chapter_breaks: List[int]  # positions of chapter breaks
+    chapter_titles: List[str]  # original chapter titles
 
 
 class TextEnhancer:
@@ -107,10 +108,13 @@ class TextEnhancer:
         voice_assignments = {}
         pause_markers = []
         chapter_breaks = []
+        chapter_titles = []
         current_position = 0
         
         # Process each chapter
         for chapter in doc_structure.chapters:
+            # Store original chapter title
+            chapter_titles.append(chapter.title)
             # Add chapter break marker
             chapter_breaks.append(current_position)
             
@@ -147,7 +151,8 @@ class TextEnhancer:
             voice_assignments=voice_assignments,
             pause_markers=pause_markers,
             pronunciation_guides=self.pronunciation_dict,
-            chapter_breaks=chapter_breaks
+            chapter_breaks=chapter_breaks,
+            chapter_titles=chapter_titles
         )
     
     def _enhance_chapter_title(self, title: str) -> str:
@@ -229,6 +234,10 @@ class TextEnhancer:
             r'\\lim_\{([^}]+)\}': r'limit as \1 of',
             r'\^(\w+)': r' to the power of \1',
             r'_(\w+)': r' sub \1',
+            r'\\hbar': ' h-bar ',
+            r'\\partial': ' partial ',
+            r'\\psi': ' psi ',
+            r'\\hat\{([^}]+)\}': r'\1 hat',
             r'\\cdot': ' times ',
             r'\\times': ' times ',
             r'\\div': ' divided by ',

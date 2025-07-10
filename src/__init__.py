@@ -12,9 +12,9 @@ __author__ = "ucli-tools"
 __email__ = "contact@ucli-tools.org"
 __license__ = "Apache 2.0"
 
-from .markdown_processor import MarkdownProcessor
-from .text_enhancer import TextEnhancer
-from .audiobook_generator import AudiobookGenerator
+from markdown_processor import MarkdownProcessor
+from text_enhancer import TextEnhancer
+from audiobook_generator import AudiobookGenerator
 
 __all__ = [
     "MarkdownProcessor",

@@ -4,6 +4,7 @@ Part of md2audiobook pipeline
 """
 
 import os
+import re
 import subprocess
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
@@ -14,7 +15,7 @@ import shutil
 from pydub import AudioSegment
 from mutagen.mp4 import MP4, MP4Cover
 import requests
-from .text_enhancer import EnhancedText
+from text_enhancer import EnhancedText
 
 
 @dataclass
@@ -182,10 +183,20 @@ class AudiobookGenerator:
             
             chapter_content = content[start_pos:end_pos].strip()
             
-            # Extract chapter title (first line)
-            lines = chapter_content.split('\n')
-            title = lines[0] if lines else f'Chapter {i + 1}'
-            content_text = '\n'.join(lines[1:]) if len(lines) > 1 else chapter_content
+            # Use original chapter title from enhanced_text if available
+            if hasattr(enhanced_text, 'chapter_titles') and i < len(enhanced_text.chapter_titles):
+                title = enhanced_text.chapter_titles[i]
+            else:
+                # Fallback: extract from content (legacy behavior)
+                lines = chapter_content.split('\n')
+                raw_title = lines[0] if lines else f'Chapter {i + 1}'
+                title = raw_title.replace('Chapter: ', '').strip()
+                title = re.sub(r'^#+\s*', '', title)
+                if not title or len(title.strip()) < 3:
+                    title = f'Chapter {i + 1}'
+            
+            # Use all content for this chapter (don't skip first line)
+            content_text = chapter_content
             
             # Filter voice assignments for this chapter
             chapter_voice_assignments = {}
@@ -197,7 +208,7 @@ class AudiobookGenerator:
                     chapter_voice_assignments[new_key] = voice
             
             chapters.append({
-                'title': title.replace('Chapter: ', ''),
+                'title': title,
                 'content': content_text,
                 'voice_assignments': chapter_voice_assignments
             })
@@ -343,6 +354,13 @@ class AudiobookGenerator:
     
     def _synthesize_with_piper(self, text: str, voice_config: Dict[str, Any]) -> AudioSegment:
         """Synthesize audio using Piper TTS"""
+        # Check if piper is available
+        if not self._is_piper_available():
+            if not hasattr(self, '_piper_warning_shown'):
+                print("Warning: Piper TTS not found. Using espeak fallback.")
+                self._piper_warning_shown = True
+            return self._generate_fallback_audio(text)
+            
         try:
             voice_id = voice_config.get('voice_id', 'en_US-lessac-medium')
             speed = voice_config.get('speed', 1.0)
@@ -360,11 +378,10 @@ class AudiobookGenerator:
                 'piper',
                 '--model', voice_id,
                 '--output_file', str(audio_file),
-                '--length_scale', str(1.0 / speed)  # Piper uses length_scale (inverse of speed)
+                '--input_file', str(text_file)
             ]
             
-            with open(text_file, 'r') as f:
-                result = subprocess.run(cmd, stdin=f, capture_output=True, text=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             
             if result.returncode == 0 and audio_file.exists():
                 # Load audio
@@ -376,12 +393,24 @@ class AudiobookGenerator:
                 
                 return audio
             else:
-                print(f"Piper TTS failed: {result.stderr}")
+                if not hasattr(self, '_piper_error_shown'):
+                    print(f"Piper TTS failed, using fallback. Error: {result.stderr}")
+                    self._piper_error_shown = True
                 return self._generate_fallback_audio(text)
                 
         except Exception as e:
-            print(f"Piper synthesis error: {e}")
+            if not hasattr(self, '_piper_exception_shown'):
+                print(f"Piper synthesis error, using fallback: {e}")
+                self._piper_exception_shown = True
             return self._generate_fallback_audio(text)
+    
+    def _is_piper_available(self) -> bool:
+        """Check if Piper TTS is available"""
+        try:
+            subprocess.run(['piper', '--version'], capture_output=True, text=True)
+            return True
+        except FileNotFoundError:
+            return False
     
     def _synthesize_with_elevenlabs(self, text: str, voice_config: Dict[str, Any]) -> AudioSegment:
         """Synthesize audio using ElevenLabs API"""

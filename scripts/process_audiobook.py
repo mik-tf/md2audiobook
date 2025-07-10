@@ -184,7 +184,7 @@ Examples:
         # Stage 1: Markdown Processing
         print("Stage 1: Processing Markdown...")
         markdown_processor = MarkdownProcessor(config)
-        doc_structure = markdown_processor.process_file(args.input)
+        doc_structure = markdown_processor.process_document(args.input)
         
         if args.verbose:
             print(f"  - Found {len(doc_structure.chapters)} chapters")
