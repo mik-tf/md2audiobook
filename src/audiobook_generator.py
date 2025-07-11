@@ -101,6 +101,22 @@ class AudiobookGenerator:
                 'type': 'api',
                 'config': google_config
             }
+        
+        # Hugging Face TTS (API)
+        huggingface_config = self.tts_providers.get('huggingface', {})
+        if huggingface_config.get('enabled', False) and os.getenv('HUGGINGFACE_API_KEY'):
+            self.available_providers['huggingface'] = {
+                'type': 'api',
+                'config': huggingface_config
+            }
+        
+        # OpenAI TTS (API)
+        openai_config = self.tts_providers.get('openai', {})
+        if openai_config.get('enabled', False) and os.getenv('OPENAI_API_KEY'):
+            self.available_providers['openai'] = {
+                'type': 'api',
+                'config': openai_config
+            }
     
     def generate_audiobook(self, enhanced_text: EnhancedText, 
                           metadata: Dict[str, Any], 
@@ -325,6 +341,10 @@ class AudiobookGenerator:
             return self._synthesize_with_azure(clean_text, voice_config)
         elif provider == 'google':
             return self._synthesize_with_google(clean_text, voice_config)
+        elif provider == 'huggingface':
+            return self._synthesize_with_huggingface(clean_text, voice_config)
+        elif provider == 'openai':
+            return self._synthesize_with_openai(clean_text, voice_config)
         else:
             # Fallback to piper
             return self._synthesize_with_piper(clean_text, voice_config)
@@ -472,6 +492,81 @@ class AudiobookGenerator:
         # Implementation would go here
         # For now, fallback to Piper
         return self._synthesize_with_piper(text, voice_config)
+    
+    def _synthesize_with_huggingface(self, text: str, voice_config: Dict[str, Any]) -> AudioSegment:
+        """Synthesize audio using Hugging Face TTS API"""
+        try:
+            api_key = os.getenv('HUGGINGFACE_API_KEY')
+            if not api_key:
+                print("Warning: HUGGINGFACE_API_KEY not found. Using fallback.")
+                return self._generate_fallback_audio(text)
+            
+            # Get model configuration
+            model = voice_config.get('model', 'microsoft/speecht5_tts')
+            api_url = f"https://api-inference.huggingface.co/models/{model}"
+            
+            # Prepare headers
+            headers = {
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json'
+            }
+            
+            # Prepare payload
+            payload = {
+                'inputs': text,
+                'parameters': {
+                    'speaker_embeddings': voice_config.get('speaker_embeddings', None)
+                }
+            }
+            
+            # Remove None values from parameters
+            payload['parameters'] = {k: v for k, v in payload['parameters'].items() if v is not None}
+            if not payload['parameters']:
+                del payload['parameters']
+            
+            # Make API request
+            response = requests.post(api_url, headers=headers, json=payload, timeout=60)
+            
+            if response.status_code == 200:
+                # Save audio data to temporary file
+                audio_file = self.temp_dir / f"hf_audio_{hash(text)}.wav"
+                with open(audio_file, 'wb') as f:
+                    f.write(response.content)
+                
+                # Load and return audio
+                audio = AudioSegment.from_wav(str(audio_file))
+                
+                # Clean up temporary file
+                audio_file.unlink(missing_ok=True)
+                
+                return audio
+            
+            elif response.status_code == 503:
+                print(f"Hugging Face model loading (this may take a moment)...")
+                # Model is loading, wait and retry once
+                import time
+                time.sleep(10)
+                
+                response = requests.post(api_url, headers=headers, json=payload, timeout=60)
+                if response.status_code == 200:
+                    audio_file = self.temp_dir / f"hf_audio_{hash(text)}.wav"
+                    with open(audio_file, 'wb') as f:
+                        f.write(response.content)
+                    
+                    audio = AudioSegment.from_wav(str(audio_file))
+                    audio_file.unlink(missing_ok=True)
+                    return audio
+                else:
+                    print(f"Hugging Face TTS error after retry: {response.status_code} - {response.text}")
+                    return self._generate_fallback_audio(text)
+            
+            else:
+                print(f"Hugging Face TTS error: {response.status_code} - {response.text}")
+                return self._generate_fallback_audio(text)
+                
+        except Exception as e:
+            print(f"Hugging Face TTS synthesis error: {e}")
+            return self._generate_fallback_audio(text)
     
     def _generate_fallback_audio(self, text: str) -> AudioSegment:
         """Generate fallback audio using espeak"""

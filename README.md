@@ -144,9 +144,22 @@ voices:
 
 ## 📚 Documentation
 
-- **[Architecture](docs/architecture.md)** - Detailed system design
-- **[Configuration](docs/configuration.md)** - Setup and customization
+### Core Documentation
+- **[Architecture](docs/architecture.md)** - Detailed system design and pipeline overview
+- **[Configuration](docs/configuration.md)** - Setup and customization options
 - **[Examples](docs/examples.md)** - Usage examples and tutorials
+
+### TTS Provider Guides
+- **[TTS Providers Overview](docs/tts-providers.md)** - Complete comparison of all TTS options
+- **[Setup Guides](docs/setup-guides.md)** - Step-by-step provider configuration
+- **[Cost Calculator](docs/cost-calculator.md)** - Pricing analysis and ROI calculator
+- **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
+
+### Quick Reference
+- **Free Options**: Piper TTS (offline), Hugging Face (API)
+- **Premium Options**: ElevenLabs, Google Cloud, Azure, Amazon Polly
+- **Best Value**: Google Cloud Standard ($4/1M characters)
+- **Highest Quality**: ElevenLabs ($5-99/month) or Google Neural2
 
 ## 🧪 Testing
 
