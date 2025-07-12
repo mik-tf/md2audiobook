@@ -56,59 +56,199 @@ class TextEnhancer:
             self.pandoc_available = False
             self.logger.warning("Pandoc not available, falling back to basic math processing")
         
-        # LaTeX to speech mappings
+        # Comprehensive LaTeX to speech mappings for math teacher-style narration
         self.latex_to_speech = {
-            # Greek letters
-            r'\\alpha': 'alpha',
-            r'\\beta': 'beta', 
-            r'\\gamma': 'gamma',
-            r'\\delta': 'delta',
-            r'\\epsilon': 'epsilon',
-            r'\\lambda': 'lambda',
-            r'\\mu': 'mu',
-            r'\\nu': 'nu',
-            r'\\pi': 'pi',
-            r'\\rho': 'rho',
-            r'\\sigma': 'sigma',
-            r'\\tau': 'tau',
-            r'\\theta': 'theta',
-            r'\\phi': 'phi',
-            r'\\chi': 'chi',
-            r'\\psi': 'psi',
-            r'\\omega': 'omega',
+            # Complex fractions and nested structures
+            r'\\frac\{([^{}]+)\}\{([^{}]+)\}': r'\g<1> over \g<2>',
             
-            # Mathematical operators
+            # Roots with proper handling
+            r'\\sqrt\{([^{}]+)\}': r'the square root of \g<1>',
+            r'\\sqrt\[([^]]+)\]\{([^{}]+)\}': r'the \g<1>-th root of \g<2>',
+            
+            # Summation and integration with bounds
+            r'\\sum_\{([^}]+)\}\^\{([^}]+)\}': r'the sum from \g<1> to \g<2> of',
+            r'\\sum': ' the sum of ',
+            r'\\int_\{([^}]+)\}\^\{([^}]+)\}': r'the integral from \g<1> to \g<2> of',
+            r'\\int': ' the integral of ',
+            r'\\oint': ' the contour integral of ',
+            
+            # Limits with proper phrasing
+            r'\\lim_\{([^}]+)\\to\s*([^}]+)\}': r'the limit as \g<1> approaches \g<2> of',
+            r'\\lim_\{([^}]+)\}': r'the limit as \g<1> of',
+            
+            # Products
+            r'\\prod_\{([^}]+)\}\^\{([^}]+)\}': r'the product from \g<1> to \g<2> of',
+            r'\\prod': ' the product of ',
+            
+            # Derivatives and differentials
+            r'\\frac\{d\}\{d([^}]+)\}': r'the derivative with respect to \g<1> of',
+            r'\\frac\{\\partial\}\{\\partial\s*([^}]+)\}': r'the partial derivative with respect to \g<1> of',
+            r'\\partial\^\{([^}]+)\}': r'partial to the power of \g<1>',
+            r'\\partial': ' partial ',
+            r'\\nabla\^\{([^}]+)\}': r'del operator to the power of \g<1>',
+            r'\\nabla': ' del operator ',
+            
+            # Superscripts and subscripts with context
+            r'([a-zA-Z])\^\{([^}]+)\}': r'\g<1> to the power of \g<2>',
+            r'([a-zA-Z])_\{([^}]+)\}': r'\g<1> subscript \g<2>',
+            r'\^\{([^}]+)\}': r' to the power of \g<1>',
+            r'_\{([^}]+)\}': r' subscript \g<1>',
+            
+            # Quantum mechanics specific (MUST be processed before Greek letters and absolute values)
+            # Process inner products first (most specific patterns)
+            r'\\langle\s*([^|]+)\s*\|\s*([^\rangle]+)\s*\\rangle': r'the inner product of \g<1> and \g<2>',
+            r'\\braket\{([^}]+)\}\{([^}]+)\}': r'the inner product of \g<1> and \g<2>',
+            # Then individual bra and ket notation
+            r'\|([^\rangle|]+)\\rangle': r'ket \g<1>',
+            r'\\langle([^|]+)\|': r'bra \g<1>',
+            r'\\bra\{([^}]+)\}': r'bra \g<1>',
+            r'\\ket\{([^}]+)\}': r'ket \g<1>',
+            
+            # Greek letters (lowercase)
+            r'\\alpha': ' alpha ',
+            r'\\beta': ' beta ',
+            r'\\gamma': ' gamma ',
+            r'\\delta': ' delta ',
+            r'\\epsilon': ' epsilon ',
+            r'\\varepsilon': ' epsilon ',
+            r'\\zeta': ' zeta ',
+            r'\\eta': ' eta ',
+            r'\\theta': ' theta ',
+            r'\\vartheta': ' theta ',
+            r'\\iota': ' iota ',
+            r'\\kappa': ' kappa ',
+            r'\\lambda': ' lambda ',
+            r'\\mu': ' mu ',
+            r'\\nu': ' nu ',
+            r'\\xi': ' xi ',
+            r'\\pi': ' pi ',
+            r'\\varpi': ' pi ',
+            r'\\rho': ' rho ',
+            r'\\varrho': ' rho ',
+            r'\\sigma': ' sigma ',
+            r'\\varsigma': ' sigma ',
+            r'\\tau': ' tau ',
+            r'\\upsilon': ' upsilon ',
+            r'\\phi': ' phi ',
+            r'\\varphi': ' phi ',
+            r'\\chi': ' chi ',
+            r'\\psi': ' psi ',
+            r'\\omega': ' omega ',
+            
+            # Greek letters (uppercase)
+            r'\\Gamma': ' capital gamma ',
+            r'\\Delta': ' capital delta ',
+            r'\\Theta': ' capital theta ',
+            r'\\Lambda': ' capital lambda ',
+            r'\\Xi': ' capital xi ',
+            r'\\Pi': ' capital pi ',
+            r'\\Sigma': ' capital sigma ',
+            r'\\Upsilon': ' capital upsilon ',
+            r'\\Phi': ' capital phi ',
+            r'\\Psi': ' capital psi ',
+            r'\\Omega': ' capital omega ',
+            
+            # Mathematical operators with context
             r'\\cdot': ' times ',
-            r'\\times': ' times ',
+            r'\\times': ' cross product ',
             r'\\div': ' divided by ',
             r'\\pm': ' plus or minus ',
             r'\\mp': ' minus or plus ',
-            r'\\leq': ' less than or equal to ',
-            r'\\le': ' less than or equal to ',
-            r'\\geq': ' greater than or equal to ',
-            r'\\ge': ' greater than or equal to ',
-            r'\\neq': ' not equal to ',
-            r'\\approx': ' approximately equals ',
+            r'\\leq': ' is less than or equal to ',
+            r'\\le\b': ' is less than or equal to ',
+            r'\\geq': ' is greater than or equal to ',
+            r'\\ge': ' is greater than or equal to ',
+            r'\\neq': ' is not equal to ',
+            r'\\approx': ' is approximately equal to ',
             r'\\equiv': ' is equivalent to ',
+            r'\\sim': ' is similar to ',
+            r'\\propto': ' is proportional to ',
             
-            # Set theory
-            r'\\in': ' is in ',
+            # Set theory and logic (use word boundaries to prevent partial matches)
+            r'\\in\b': ' is an element of ',
+            r'\\notin\b': ' is not an element of ',
             r'\\subset': ' is a subset of ',
+            r'\\subseteq': ' is a subset of or equal to ',
+            r'\\supset': ' is a superset of ',
+            r'\\supseteq': ' is a superset of or equal to ',
             r'\\cup': ' union ',
             r'\\cap': ' intersection ',
-            r'\\emptyset': ' empty set ',
+            r'\\emptyset': ' the empty set ',
+            r'\\varnothing': ' the empty set ',
+            r'\\forall': ' for all ',
+            r'\\exists': ' there exists ',
+            r'\\nexists': ' there does not exist ',
             
-            # Special symbols
+            # Functions and special expressions
+            r'\\sin': ' sine of ',
+            r'\\cos': ' cosine of ',
+            r'\\tan': ' tangent of ',
+            r'\\sec': ' secant of ',
+            r'\\csc': ' cosecant of ',
+            r'\\cot': ' cotangent of ',
+            r'\\arcsin': ' arcsine of ',
+            r'\\arccos': ' arccosine of ',
+            r'\\arctan': ' arctangent of ',
+            r'\\sinh': ' hyperbolic sine of ',
+            r'\\cosh': ' hyperbolic cosine of ',
+            r'\\tanh': ' hyperbolic tangent of ',
+            r'\\ln': ' natural log of ',
+            r'\\log': ' log of ',
+            r'\\exp': ' exponential of ',
+            
+            # Vectors and matrices
+            r'\\mathbf\{([^}]+)\}': r'bold \g<1>',
+            r'\\vec\{([^}]+)\}': r'vector \g<1>',
+            r'\\hat\{([^}]+)\}': r'\g<1> hat',
+            r'\\bar\{([^}]+)\}': r'\g<1> bar',
+            r'\\tilde\{([^}]+)\}': r'\g<1> tilde',
+            r'\\dot\{([^}]+)\}': r'\g<1> dot',
+            r'\\ddot\{([^}]+)\}': r'\g<1> double dot',
+            
+            # Matrix environments
+            r'\\begin\{pmatrix\}([^\\]+)\\end\{pmatrix\}': r'the matrix \g<1>',
+            r'\\begin\{bmatrix\}([^\\]+)\\end\{bmatrix\}': r'the matrix \g<1>',
+            r'\\begin\{vmatrix\}([^\\]+)\\end\{vmatrix\}': r'the determinant of \g<1>',
+            r'\\\\': ' and ',  # Matrix row separator
+            r'&': ' ',  # Matrix column separator
+            
+            # Special symbols and constants
             r'\\infty': ' infinity ',
             r'\\ldots': ' dot dot dot ',
+            r'\\cdots': ' dot dot dot ',
+            r'\\vdots': ' vertical dots ',
+            r'\\ddots': ' diagonal dots ',
             r'\\hbar': ' h-bar ',
-            r'\\partial': ' partial ',
+            r'\\ell': ' script l ',
             
-            # Brackets and arrows
+            # Brackets and delimiters
             r'\\langle': ' left angle bracket ',
             r'\\rangle': ' right angle bracket ',
+            r'\\lfloor': ' floor of ',
+            r'\\rfloor': '',
+            r'\\lceil': ' ceiling of ',
+            r'\\rceil': '',
+            r'\\left\(': ' ',
+            r'\\right\)': ' ',
+            r'\\left\[': ' open bracket ',
+            r'\\right\]': ' close bracket ',
+            r'\\left\{': ' open brace ',
+            r'\\right\}': ' close brace ',
+            
+            # Absolute value and norms (order matters - double bars first)
+            r'\|\|([^|]+)\|\|': r'the norm of \g<1>',
+            r'\|([^|]+)\|': r'the absolute value of \g<1>',
+            
+            # Arrows and relations
+            r'\\rightarrow': ' implies ',
+            r'\\leftarrow': ' is implied by ',
+            r'\\leftrightarrow': ' if and only if ',
+            r'\\Rightarrow': ' implies ',
+            r'\\Leftarrow': ' is implied by ',
+            r'\\Leftrightarrow': ' if and only if ',
             r'\\uparrow': ' up arrow ',
             r'\\downarrow': ' down arrow ',
+            r'\\mapsto': ' maps to ',
         }
         
         # Load pronunciation dictionaries
@@ -274,11 +414,11 @@ class TextEnhancer:
                 if math_expr.is_block:
                     # Block math ($$...$$)
                     replacement = f"[MATH_BLOCK] {spoken_math} [/MATH_BLOCK]"
-                    pattern = f"$$\s*{re.escape(math_expr.latex)}\s*$$"
+                    pattern = rf"\$\$\s*{re.escape(math_expr.latex)}\s*\$\$"
                 else:
                     # Inline math ($...$)
                     replacement = f"[MATH] {spoken_math} [/MATH]"
-                    pattern = f"$\s*{re.escape(math_expr.latex)}\s*$"
+                    pattern = rf"\$\s*{re.escape(math_expr.latex)}\s*\$"
                 
                 # Use raw string replacement to avoid escape issues
                 processed_content = re.sub(pattern, lambda m: replacement, processed_content, count=1)
@@ -289,10 +429,10 @@ class TextEnhancer:
                 spoken_math = self._fallback_latex_to_speech(math_expr.latex)
                 if math_expr.is_block:
                     replacement = f"[MATH_BLOCK] {spoken_math} [/MATH_BLOCK]"
-                    pattern = f"$$\s*{re.escape(math_expr.latex)}\s*$$"
+                    pattern = rf"\$\$\s*{re.escape(math_expr.latex)}\s*\$\$"
                 else:
                     replacement = f"[MATH] {spoken_math} [/MATH]"
-                    pattern = f"$\s*{re.escape(math_expr.latex)}\s*$"
+                    pattern = rf"\$\s*{re.escape(math_expr.latex)}\s*\$"
                 
                 # Use raw string replacement to avoid escape issues
                 processed_content = re.sub(pattern, lambda m: replacement, processed_content, count=1)
@@ -380,30 +520,80 @@ class TextEnhancer:
         return spoken
     
     def _handle_complex_latex_structures(self, latex: str) -> str:
-        """Handle complex LaTeX structures like fractions, integrals, etc."""
-        # Fractions
-        latex = re.sub(r'\\frac\{([^}]+)\}\{([^}]+)\}', r'\1 over \2', latex)
+        """Handle complex LaTeX structures with math teacher-style narration"""
+        # Handle nested fractions with proper phrasing
+        latex = re.sub(r'\\frac\{([^{}]+(?:\{[^{}]*\}[^{}]*)*)\}\{([^{}]+(?:\{[^{}]*\}[^{}]*)*)\}', 
+                      lambda m: f"the fraction {m.group(1)} over {m.group(2)}", latex)
         
-        # Square roots
-        latex = re.sub(r'\\sqrt\{([^}]+)\}', r'square root of \1', latex)
+        # Handle matrix and vector notation
+        latex = re.sub(r'\\begin\{pmatrix\}([^\\]+)\\end\{pmatrix\}', 
+                      r'the matrix \g<1>', latex)
+        latex = re.sub(r'\\begin\{bmatrix\}([^\\]+)\\end\{bmatrix\}', 
+                      r'the matrix \g<1>', latex)
+        latex = re.sub(r'\\begin\{vmatrix\}([^\\]+)\\end\{vmatrix\}', 
+                      r'the determinant of \g<1>', latex)
         
-        # Summations
-        latex = re.sub(r'\\sum_\{([^}]+)\}\^\{([^}]+)\}', r'sum from \1 to \2 of', latex)
+        # Handle equation environments
+        latex = re.sub(r'\\begin\{equation\}([^\\]+)\\end\{equation\}', 
+                      r'the equation \g<1>', latex)
+        latex = re.sub(r'\\begin\{align\}([^\\]+)\\end\{align\}', 
+                      r'the aligned equations \g<1>', latex)
         
-        # Integrals
-        latex = re.sub(r'\\int_\{([^}]+)\}\^\{([^}]+)\}', r'integral from \1 to \2 of', latex)
+        # Handle cases and piecewise functions
+        latex = re.sub(r'\\begin\{cases\}([^\\]+)\\end\{cases\}', 
+                      r'the piecewise function \g<1>', latex)
         
-        # Limits
-        latex = re.sub(r'\\lim_\{([^}]+)\}', r'limit as \1 of', latex)
+        # Handle binomial coefficients
+        latex = re.sub(r'\\binom\{([^}]+)\}\{([^}]+)\}', 
+                      r'\g<1> choose \g<2>', latex)
         
-        # Superscripts and subscripts
-        latex = re.sub(r'\^\{([^}]+)\}', r' to the power of \1', latex)
-        latex = re.sub(r'_\{([^}]+)\}', r' sub \1', latex)
-        latex = re.sub(r'\^(\w+)', r' to the power of \1', latex)
-        latex = re.sub(r'_(\w+)', r' sub \1', latex)
+        # Handle complex superscripts and subscripts with context
+        latex = re.sub(r'([a-zA-Z])\^\{([^}]+)\}_\{([^}]+)\}', 
+                      r'\g<1> to the power of \g<2> subscript \g<3>', latex)
+        latex = re.sub(r'([a-zA-Z])_\{([^}]+)\}\^\{([^}]+)\}', 
+                      r'\g<1> subscript \g<2> to the power of \g<3>', latex)
         
-        # Hat notation
-        latex = re.sub(r'\\hat\{([^}]+)\}', r'\1 hat', latex)
+        # Handle simple superscripts and subscripts
+        latex = re.sub(r'\^\{([^}]+)\}', r' to the power of \g<1>', latex)
+        latex = re.sub(r'_\{([^}]+)\}', r' subscript \g<1>', latex)
+        latex = re.sub(r'\^(\w+)', r' to the power of \g<1>', latex)
+        latex = re.sub(r'_(\w+)', r' subscript \g<1>', latex)
+        
+        # Handle special function notation
+        latex = re.sub(r'\\operatorname\{([^}]+)\}', r'\g<1>', latex)
+        latex = re.sub(r'\\text\{([^}]+)\}', r'\g<1>', latex)
+        latex = re.sub(r'\\mathrm\{([^}]+)\}', r'\g<1>', latex)
+        
+        # Handle absolute values and norms
+        latex = re.sub(r'\\left\|([^\\]+)\\right\|', r'the norm of \g<1>', latex)
+        latex = re.sub(r'\|([^|]+)\|', r'the absolute value of \g<1>', latex)
+        
+        # Handle floor and ceiling functions
+        latex = re.sub(r'\\lfloor([^\\]+)\\rfloor', r'the floor of \g<1>', latex)
+        latex = re.sub(r'\\lceil([^\\]+)\\rceil', r'the ceiling of \g<1>', latex)
+        
+        # Handle complex numbers
+        latex = re.sub(r'\\mathbb\{([^}]+)\}', r'the \g<1> numbers', latex)
+        latex = re.sub(r'\\mathcal\{([^}]+)\}', r'script \g<1>', latex)
+        
+        # Handle spacing and alignment
+        latex = re.sub(r'\\\\', ' and ', latex)  # Line breaks in equations
+        latex = re.sub(r'\\quad', ' ', latex)  # Spacing
+        latex = re.sub(r'\\qquad', ' ', latex)  # More spacing
+        latex = re.sub(r'\\,', ' ', latex)  # Small space
+        latex = re.sub(r'\\;', ' ', latex)  # Medium space
+        latex = re.sub(r'\\:', ' ', latex)  # Medium space
+        latex = re.sub(r'\\!', '', latex)  # Negative space
+        
+        # Clean up multiple spaces and trim
+        latex = re.sub(r'\s+', ' ', latex).strip()
+        
+        # Add natural pauses for complex expressions
+        if len(latex.split()) > 10:
+            # Add pauses after major mathematical operations
+            latex = re.sub(r'(equals?|is|are)\s+', r'\g<1> [PAUSE] ', latex)
+            latex = re.sub(r'(therefore|thus|hence)\s+', r'\g<1> [PAUSE] ', latex)
+            latex = re.sub(r'(where|such that|given that)\s+', r'\g<1> [PAUSE] ', latex)
         
         return latex
     
@@ -416,10 +606,10 @@ class TextEnhancer:
             
             if math_expr.is_block:
                 replacement = f"[MATH_BLOCK] {spoken_math} [/MATH_BLOCK]"
-                pattern = f"$$\s*{re.escape(math_expr.latex)}\s*$$"
+                pattern = rf"\$\$\s*{re.escape(math_expr.latex)}\s*\$\$"
             else:
                 replacement = f"[MATH] {spoken_math} [/MATH]"
-                pattern = f"$\s*{re.escape(math_expr.latex)}\s*$"
+                pattern = rf"\$\s*{re.escape(math_expr.latex)}\s*\$"
             
             processed_content = re.sub(pattern, replacement, processed_content, count=1)
         
