@@ -489,9 +489,52 @@ class AudiobookGenerator:
     
     def _synthesize_with_google(self, text: str, voice_config: Dict[str, Any]) -> AudioSegment:
         """Synthesize audio using Google Cloud TTS"""
-        # Implementation would go here
-        # For now, fallback to Piper
-        return self._synthesize_with_piper(text, voice_config)
+        try:
+            from google.cloud import texttospeech
+            import io
+            
+            # Get Google TTS configuration
+            google_config = self.available_providers.get('google', {}).get('config', {})
+            
+            # Initialize the client
+            client = texttospeech.TextToSpeechClient()
+            
+            # Set up the synthesis input
+            synthesis_input = texttospeech.SynthesisInput(text=text)
+            
+            # Build the voice request
+            voice = texttospeech.VoiceSelectionParams(
+                language_code=voice_config.get('language_code', google_config.get('language_code', 'en-US')),
+                name=voice_config.get('voice_id', google_config.get('default_voice', 'en-US-Wavenet-D'))
+            )
+            
+            # Select the type of audio file
+            audio_config = texttospeech.AudioConfig(
+                audio_encoding=texttospeech.AudioEncoding.MP3,
+                speaking_rate=voice_config.get('speed', 1.0),
+                pitch=voice_config.get('pitch', 0.0)
+            )
+            
+            # Perform the text-to-speech request
+            response = client.synthesize_speech(
+                input=synthesis_input,
+                voice=voice,
+                audio_config=audio_config
+            )
+            
+            # Convert response to AudioSegment
+            audio_data = io.BytesIO(response.audio_content)
+            audio_segment = AudioSegment.from_mp3(audio_data)
+            
+            print(f"✓ Google TTS: Generated {len(audio_segment)/1000:.1f}s audio")
+            return audio_segment
+            
+        except ImportError:
+            print("Warning: Google Cloud TTS library not installed. Install with: pip install google-cloud-texttospeech")
+            return self._generate_fallback_audio(text)
+        except Exception as e:
+            print(f"Google TTS error: {e}")
+            return self._generate_fallback_audio(text)
     
     def _synthesize_with_huggingface(self, text: str, voice_config: Dict[str, Any]) -> AudioSegment:
         """Synthesize audio using Hugging Face TTS API"""
@@ -635,10 +678,14 @@ class AudiobookGenerator:
         m4a_path = output_path.with_suffix('.m4a')
         
         # Export audio
+        bitrate = self.audio_config.get('bitrate', '128k')
+        if not bitrate.endswith('k'):
+            bitrate = f"{bitrate}k"
+        
         audiobook.audio.export(
             str(m4a_path),
             format="mp4",
-            bitrate=f"{self.audio_config.get('bitrate', 128)}k",
+            bitrate=bitrate,
             parameters=["-c:a", "aac"]
         )
         
@@ -698,10 +745,14 @@ class AudiobookGenerator:
     
     def _export_mp3(self, audiobook: AudiobookOutput, output_path: Path):
         """Export as MP3 format"""
+        bitrate = self.audio_config.get('bitrate', '128k')
+        if not bitrate.endswith('k'):
+            bitrate = f"{bitrate}k"
+            
         audiobook.audio.export(
             str(output_path.with_suffix('.mp3')),
             format="mp3",
-            bitrate=f"{self.audio_config.get('bitrate', 128)}k"
+            bitrate=bitrate
         )
         audiobook.file_path = output_path.with_suffix('.mp3')
     

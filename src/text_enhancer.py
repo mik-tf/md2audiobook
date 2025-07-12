@@ -227,17 +227,17 @@ class TextEnhancer:
         
         # Handle common LaTeX commands
         latex_commands = {
-            r'\\frac\{([^}]+)\}\{([^}]+)\}': r'\1 over \2',
-            r'\\sqrt\{([^}]+)\}': r'square root of \1',
-            r'\\sum_\{([^}]+)\}\^\{([^}]+)\}': r'sum from \1 to \2 of',
-            r'\\int_\{([^}]+)\}\^\{([^}]+)\}': r'integral from \1 to \2 of',
-            r'\\lim_\{([^}]+)\}': r'limit as \1 of',
-            r'\^(\w+)': r' to the power of \1',
-            r'_(\w+)': r' sub \1',
+            r'\\frac\{([^}]+)\}\{([^}]+)\}': r'\g<1> over \g<2>',
+            r'\\sqrt\{([^}]+)\}': r'square root of \g<1>',
+            r'\\sum_\{([^}]+)\}\^\{([^}]+)\}': r'sum from \g<1> to \g<2> of',
+            r'\\int_\{([^}]+)\}\^\{([^}]+)\}': r'integral from \g<1> to \g<2> of',
+            r'\\lim_\{([^}]+)\}': r'limit as \g<1> of',
+            r'\^(\w+)': r' to the power of \g<1>',
+            r'_(\w+)': r' sub \g<1>',
             r'\\hbar': ' h-bar ',
             r'\\partial': ' partial ',
             r'\\psi': ' psi ',
-            r'\\hat\{([^}]+)\}': r'\1 hat',
+            r'\\hat\{([^}]+)\}': r'\g<1> hat',
             r'\\cdot': ' times ',
             r'\\times': ' times ',
             r'\\div': ' divided by ',
@@ -254,6 +254,7 @@ class TextEnhancer:
             r'\\cap': ' intersection ',
             r'\\emptyset': ' empty set ',
             r'\\infty': ' infinity ',
+            r'\\ldots': ' dot dot dot ',
         }
         
         for pattern, replacement in latex_commands.items():
@@ -352,11 +353,11 @@ class TextEnhancer:
             if len(sentence) > 200:
                 # Split on conjunctions and add pauses
                 sentence = re.sub(r'\b(and|but|however|therefore|moreover|furthermore)\b', 
-                                r'[PAUSE] \1', sentence)
+                                r'[PAUSE] \g<1>', sentence)
             
             # Add emphasis markers for important terms
-            sentence = re.sub(r'\*\*([^*]+)\*\*', r'[EMPHASIS] \1 [/EMPHASIS]', sentence)
-            sentence = re.sub(r'\*([^*]+)\*', r'[SLIGHT_EMPHASIS] \1 [/SLIGHT_EMPHASIS]', sentence)
+            sentence = re.sub(r'\*\*([^*]+)\*\*', r'[EMPHASIS] \g<1> [/EMPHASIS]', sentence)
+            sentence = re.sub(r'\*([^*]+)\*', r'[SLIGHT_EMPHASIS] \g<1> [/SLIGHT_EMPHASIS]', sentence)
             
             optimized_sentences.append(sentence)
         

@@ -1,7 +1,7 @@
 # md2audiobook - Professional Markdown to Audiobook Pipeline
 # Part of the ucli-tools ecosystem
 
-.PHONY: help setup dev-setup demo test lint clean clean-all audiobook audiobook-basic audiobook-local-ai audiobook-api audiobook-hybrid process-all
+.PHONY: help setup dev-setup demo test lint clean clean-all audiobook audiobook-basic audiobook-local-ai audiobook-api audiobook-hybrid process-all set-google
 
 # Default target
 help:
@@ -10,6 +10,7 @@ help:
 	@echo "Available targets:"
 	@echo "  setup           - Install dependencies and setup environment"
 	@echo "  dev-setup       - Setup development environment"
+	@echo "  set-google      - Configure for Google Cloud TTS"
 	@echo "  demo            - Run demo with example document"
 	@echo ""
 	@echo "Processing Commands:"
@@ -46,6 +47,20 @@ dev-setup: setup
 	. venv/bin/activate && pip install -r requirements-dev.txt
 	. venv/bin/activate && pre-commit install
 	@echo "Development environment ready!"
+
+# Google Cloud TTS Configuration
+set-google:
+	@echo "Configuring md2audiobook for Google Cloud TTS..."
+	@if [ ! -f config/default.yaml.google ]; then echo "Error: config/default.yaml.google not found!"; exit 1; fi
+	cp config/default.yaml.google config/default.yaml
+	@echo "✓ Google Cloud TTS configuration activated"
+	@echo ""
+	@echo "Next steps:"
+	@echo "1. Ensure GOOGLE_APPLICATION_CREDENTIALS and GOOGLE_CLOUD_PROJECT are set in .env"
+	@echo "2. Run: make audiobook-api SOURCE=your_document.md"
+	@echo ""
+	@echo "Example:"
+	@echo "  make audiobook-api SOURCE=documents/example.md"
 
 # Demo and testing
 demo:

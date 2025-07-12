@@ -156,7 +156,7 @@ voices:
 - **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
 
 ### Quick Reference
-- **Free Options**: Piper TTS (offline), Hugging Face (API)
+- **Free Options**: Piper TTS (offline)
 - **Premium Options**: ElevenLabs, Google Cloud, Azure, Amazon Polly
 - **Best Value**: Google Cloud Standard ($4/1M characters)
 - **Highest Quality**: ElevenLabs ($5-99/month) or Google Neural2
