@@ -13,12 +13,12 @@ from typing import Dict, Any, Optional
 import os
 from dotenv import load_dotenv
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+# Import from src package
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from markdown_processor import MarkdownProcessor
-from text_enhancer import TextEnhancer
-from audiobook_generator import AudiobookGenerator
+from src.markdown_processor import MarkdownProcessor
+from src.text_enhancer import TextEnhancer
+from src.audiobook_generator import AudiobookGenerator
 
 
 def load_config(config_path: Optional[Path] = None) -> Dict[str, Any]:

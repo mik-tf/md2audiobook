@@ -39,7 +39,7 @@ class Chapter:
 @dataclass
 class MathExpression:
     """Mathematical expression (LaTeX)"""
-    content: str
+    latex: str  # The LaTeX content
     is_block: bool  # True for $$...$$, False for $...$
     line_number: int
     context: str  # Surrounding text for context
@@ -252,7 +252,7 @@ class MarkdownProcessor:
             context = self._get_context(content, match.start(), match.end())
             
             expressions.append(MathExpression(
-                content=match.group(1).strip(),
+                latex=match.group(1).strip(),
                 is_block=True,
                 line_number=line_num,
                 context=context
@@ -266,7 +266,7 @@ class MarkdownProcessor:
             context = self._get_context(content_no_blocks, match.start(), match.end())
             
             expressions.append(MathExpression(
-                content=match.group(1).strip(),
+                latex=match.group(1).strip(),
                 is_block=False,
                 line_number=line_num,
                 context=context
@@ -407,7 +407,7 @@ class MarkdownProcessor:
         
         # Validate math expressions
         for expr in doc_structure.math_expressions:
-            if not expr.content.strip():
+            if not expr.latex.strip():
                 issues.append(f"Empty math expression found at line {expr.line_number}")
         
         # Check for balanced math delimiters

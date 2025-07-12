@@ -15,7 +15,7 @@ import shutil
 from pydub import AudioSegment
 from mutagen.mp4 import MP4, MP4Cover
 import requests
-from text_enhancer import EnhancedText
+from .text_enhancer import EnhancedText
 
 
 @dataclass

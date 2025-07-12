@@ -5,12 +5,16 @@ Part of md2audiobook pipeline
 
 import re
 import yaml
+import json
+import subprocess
+import tempfile
+import os
+import logging
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
 import requests
-import json
-from markdown_processor import DocumentStructure, MathExpression, Citation
+from .markdown_processor import DocumentStructure, MathExpression, Citation
 
 
 @dataclass
@@ -41,6 +45,71 @@ class TextEnhancer:
         self.processing_mode = processing_mode
         self.enhancement_config = config.get('text_enhancement', {})
         self.academic_config = config.get('academic', {})
+        self.logger = logging.getLogger(__name__)
+        
+        # Check if pandoc is available
+        try:
+            subprocess.run(['pandoc', '--version'], capture_output=True, check=True)
+            self.pandoc_available = True
+            self.logger.info("Pandoc available for math processing")
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            self.pandoc_available = False
+            self.logger.warning("Pandoc not available, falling back to basic math processing")
+        
+        # LaTeX to speech mappings
+        self.latex_to_speech = {
+            # Greek letters
+            r'\\alpha': 'alpha',
+            r'\\beta': 'beta', 
+            r'\\gamma': 'gamma',
+            r'\\delta': 'delta',
+            r'\\epsilon': 'epsilon',
+            r'\\lambda': 'lambda',
+            r'\\mu': 'mu',
+            r'\\nu': 'nu',
+            r'\\pi': 'pi',
+            r'\\rho': 'rho',
+            r'\\sigma': 'sigma',
+            r'\\tau': 'tau',
+            r'\\theta': 'theta',
+            r'\\phi': 'phi',
+            r'\\chi': 'chi',
+            r'\\psi': 'psi',
+            r'\\omega': 'omega',
+            
+            # Mathematical operators
+            r'\\cdot': ' times ',
+            r'\\times': ' times ',
+            r'\\div': ' divided by ',
+            r'\\pm': ' plus or minus ',
+            r'\\mp': ' minus or plus ',
+            r'\\leq': ' less than or equal to ',
+            r'\\le': ' less than or equal to ',
+            r'\\geq': ' greater than or equal to ',
+            r'\\ge': ' greater than or equal to ',
+            r'\\neq': ' not equal to ',
+            r'\\approx': ' approximately equals ',
+            r'\\equiv': ' is equivalent to ',
+            
+            # Set theory
+            r'\\in': ' is in ',
+            r'\\subset': ' is a subset of ',
+            r'\\cup': ' union ',
+            r'\\cap': ' intersection ',
+            r'\\emptyset': ' empty set ',
+            
+            # Special symbols
+            r'\\infty': ' infinity ',
+            r'\\ldots': ' dot dot dot ',
+            r'\\hbar': ' h-bar ',
+            r'\\partial': ' partial ',
+            
+            # Brackets and arrows
+            r'\\langle': ' left angle bracket ',
+            r'\\rangle': ' right angle bracket ',
+            r'\\uparrow': ' up arrow ',
+            r'\\downarrow': ' down arrow ',
+        }
         
         # Load pronunciation dictionaries
         self._load_pronunciation_dictionaries()
@@ -191,76 +260,183 @@ class TextEnhancer:
         return enhanced_content
     
     def _process_math_expressions(self, content: str, math_expressions: List[MathExpression]) -> str:
-        """Convert LaTeX math expressions to spoken form"""
-        enhanced_content = content
+        """Convert LaTeX math expressions to spoken form using Pandoc"""
+        if not self.pandoc_available:
+            return self._fallback_math_processing(content, math_expressions)
         
-        # Sort by position (reverse order to maintain positions)
-        math_expressions_sorted = sorted(
-            [expr for expr in math_expressions if expr.content in content],
-            key=lambda x: content.find(f"${x.content}$" if not x.is_block else f"$${x.content}$$"),
-            reverse=True
-        )
+        processed_content = content
         
-        for expr in math_expressions_sorted:
-            latex_content = expr.content
-            spoken_form = self._latex_to_speech(latex_content)
-            
-            # Replace in content
-            if expr.is_block:
-                pattern = f"$${re.escape(latex_content)}$$"
-                replacement = f" [MATH BLOCK START] {spoken_form} [MATH BLOCK END] "
-            else:
-                pattern = f"${re.escape(latex_content)}$"
-                replacement = f" {spoken_form} "
-            
-            enhanced_content = re.sub(pattern, replacement, enhanced_content, count=1)
+        # Process each math expression using Pandoc
+        for math_expr in math_expressions:
+            try:
+                spoken_math = self._pandoc_latex_to_speech(math_expr.latex, math_expr.is_block)
+                
+                if math_expr.is_block:
+                    # Block math ($$...$$)
+                    replacement = f"[MATH_BLOCK] {spoken_math} [/MATH_BLOCK]"
+                    pattern = f"$$\s*{re.escape(math_expr.latex)}\s*$$"
+                else:
+                    # Inline math ($...$)
+                    replacement = f"[MATH] {spoken_math} [/MATH]"
+                    pattern = f"$\s*{re.escape(math_expr.latex)}\s*$"
+                
+                # Use raw string replacement to avoid escape issues
+                processed_content = re.sub(pattern, lambda m: replacement, processed_content, count=1)
+                
+            except Exception as e:
+                self.logger.warning(f"Failed to process math expression '{math_expr.latex}': {e}")
+                # Fall back to basic processing for this expression
+                spoken_math = self._fallback_latex_to_speech(math_expr.latex)
+                if math_expr.is_block:
+                    replacement = f"[MATH_BLOCK] {spoken_math} [/MATH_BLOCK]"
+                    pattern = f"$$\s*{re.escape(math_expr.latex)}\s*$$"
+                else:
+                    replacement = f"[MATH] {spoken_math} [/MATH]"
+                    pattern = f"$\s*{re.escape(math_expr.latex)}\s*$"
+                
+                # Use raw string replacement to avoid escape issues
+                processed_content = re.sub(pattern, lambda m: replacement, processed_content, count=1)
         
-        return enhanced_content
+        return processed_content
     
-    def _latex_to_speech(self, latex: str) -> str:
-        """Convert LaTeX expression to natural speech"""
+    def _pandoc_latex_to_speech(self, latex: str, is_block: bool = False) -> str:
+        """Convert LaTeX to speech using Pandoc AST processing"""
+        try:
+            # Create temporary markdown with the math expression
+            if is_block:
+                temp_md = f"$$\n{latex}\n$$"
+            else:
+                temp_md = f"${latex}$"
+            
+            # Use Pandoc to parse to JSON AST
+            result = subprocess.run(
+                ['pandoc', '-f', 'markdown', '-t', 'json'],
+                input=temp_md,
+                text=True,
+                capture_output=True,
+                check=True
+            )
+            
+            # Parse the JSON AST
+            ast = json.loads(result.stdout)
+            
+            # Extract and convert math expressions from AST
+            spoken_text = self._extract_math_from_ast(ast)
+            
+            return spoken_text if spoken_text else self._fallback_latex_to_speech(latex)
+            
+        except Exception as e:
+            self.logger.warning(f"Pandoc processing failed for '{latex}': {e}")
+            return self._fallback_latex_to_speech(latex)
+    
+    def _extract_math_from_ast(self, ast: dict) -> str:
+        """Extract and convert math expressions from Pandoc AST"""
+        def process_element(element):
+            if isinstance(element, dict):
+                if element.get('t') == 'Math':
+                    # Found a math element
+                    math_type = element['c'][0]['t']  # InlineMath or DisplayMath
+                    latex_content = element['c'][1]   # The actual LaTeX
+                    return self._convert_latex_ast_to_speech(latex_content)
+                elif 'c' in element:
+                    # Process children
+                    if isinstance(element['c'], list):
+                        results = []
+                        for child in element['c']:
+                            result = process_element(child)
+                            if result:
+                                results.append(result)
+                        return ' '.join(results) if results else None
+                    else:
+                        return process_element(element['c'])
+            elif isinstance(element, list):
+                results = []
+                for item in element:
+                    result = process_element(item)
+                    if result:
+                        results.append(result)
+                return ' '.join(results) if results else None
+            elif isinstance(element, str):
+                return element
+            return None
+        
+        return process_element(ast) or ""
+    
+    def _convert_latex_ast_to_speech(self, latex: str) -> str:
+        """Convert LaTeX content to natural speech"""
+        # This is where we apply sophisticated LaTeX-to-speech conversion
         spoken = latex
         
-        # Replace common symbols
-        for symbol, speech in self.math_symbols.items():
-            spoken = spoken.replace(symbol, f" {speech} ")
-        
-        # Handle common LaTeX commands
-        latex_commands = {
-            r'\\frac\{([^}]+)\}\{([^}]+)\}': r'\g<1> over \g<2>',
-            r'\\sqrt\{([^}]+)\}': r'square root of \g<1>',
-            r'\\sum_\{([^}]+)\}\^\{([^}]+)\}': r'sum from \g<1> to \g<2> of',
-            r'\\int_\{([^}]+)\}\^\{([^}]+)\}': r'integral from \g<1> to \g<2> of',
-            r'\\lim_\{([^}]+)\}': r'limit as \g<1> of',
-            r'\^(\w+)': r' to the power of \g<1>',
-            r'_(\w+)': r' sub \g<1>',
-            r'\\hbar': ' h-bar ',
-            r'\\partial': ' partial ',
-            r'\\psi': ' psi ',
-            r'\\hat\{([^}]+)\}': r'\g<1> hat',
-            r'\\cdot': ' times ',
-            r'\\times': ' times ',
-            r'\\div': ' divided by ',
-            r'\\pm': ' plus or minus ',
-            r'\\mp': ' minus or plus ',
-            r'\\leq': ' less than or equal to ',
-            r'\\geq': ' greater than or equal to ',
-            r'\\neq': ' not equal to ',
-            r'\\approx': ' approximately equals ',
-            r'\\equiv': ' is equivalent to ',
-            r'\\in': ' is in ',
-            r'\\subset': ' is a subset of ',
-            r'\\cup': ' union ',
-            r'\\cap': ' intersection ',
-            r'\\emptyset': ' empty set ',
-            r'\\infty': ' infinity ',
-            r'\\ldots': ' dot dot dot ',
-        }
-        
-        for pattern, replacement in latex_commands.items():
+        # Apply LaTeX command mappings
+        for pattern, replacement in self.latex_to_speech.items():
             spoken = re.sub(pattern, replacement, spoken)
         
-        # Clean up extra spaces
+        # Handle complex structures
+        spoken = self._handle_complex_latex_structures(spoken)
+        
+        # Clean up
+        spoken = re.sub(r'\s+', ' ', spoken).strip()
+        
+        return spoken
+    
+    def _handle_complex_latex_structures(self, latex: str) -> str:
+        """Handle complex LaTeX structures like fractions, integrals, etc."""
+        # Fractions
+        latex = re.sub(r'\\frac\{([^}]+)\}\{([^}]+)\}', r'\1 over \2', latex)
+        
+        # Square roots
+        latex = re.sub(r'\\sqrt\{([^}]+)\}', r'square root of \1', latex)
+        
+        # Summations
+        latex = re.sub(r'\\sum_\{([^}]+)\}\^\{([^}]+)\}', r'sum from \1 to \2 of', latex)
+        
+        # Integrals
+        latex = re.sub(r'\\int_\{([^}]+)\}\^\{([^}]+)\}', r'integral from \1 to \2 of', latex)
+        
+        # Limits
+        latex = re.sub(r'\\lim_\{([^}]+)\}', r'limit as \1 of', latex)
+        
+        # Superscripts and subscripts
+        latex = re.sub(r'\^\{([^}]+)\}', r' to the power of \1', latex)
+        latex = re.sub(r'_\{([^}]+)\}', r' sub \1', latex)
+        latex = re.sub(r'\^(\w+)', r' to the power of \1', latex)
+        latex = re.sub(r'_(\w+)', r' sub \1', latex)
+        
+        # Hat notation
+        latex = re.sub(r'\\hat\{([^}]+)\}', r'\1 hat', latex)
+        
+        return latex
+    
+    def _fallback_math_processing(self, content: str, math_expressions: List[MathExpression]) -> str:
+        """Fallback math processing when Pandoc is not available"""
+        processed_content = content
+        
+        for math_expr in math_expressions:
+            spoken_math = self._fallback_latex_to_speech(math_expr.latex)
+            
+            if math_expr.is_block:
+                replacement = f"[MATH_BLOCK] {spoken_math} [/MATH_BLOCK]"
+                pattern = f"$$\s*{re.escape(math_expr.latex)}\s*$$"
+            else:
+                replacement = f"[MATH] {spoken_math} [/MATH]"
+                pattern = f"$\s*{re.escape(math_expr.latex)}\s*$"
+            
+            processed_content = re.sub(pattern, replacement, processed_content, count=1)
+        
+        return processed_content
+    
+    def _fallback_latex_to_speech(self, latex: str) -> str:
+        """Fallback LaTeX to speech conversion without Pandoc"""
+        spoken = latex
+        
+        # Apply basic LaTeX command mappings
+        for pattern, replacement in self.latex_to_speech.items():
+            spoken = re.sub(pattern, replacement, spoken)
+        
+        # Handle basic structures
+        spoken = self._handle_complex_latex_structures(spoken)
+        
+        # Clean up
         spoken = re.sub(r'\s+', ' ', spoken).strip()
         
         return spoken
