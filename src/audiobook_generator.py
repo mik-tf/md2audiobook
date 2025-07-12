@@ -361,8 +361,10 @@ class AudiobookGenerator:
         clean_text = clean_text.replace('[/SLIGHT_EMPHASIS]', '')
         
         # Remove math markers
-        clean_text = clean_text.replace('[MATH BLOCK START]', '')
-        clean_text = clean_text.replace('[MATH BLOCK END]', '')
+        clean_text = clean_text.replace('[MATH_BLOCK]', '')
+        clean_text = clean_text.replace('[/MATH_BLOCK]', '')
+        clean_text = clean_text.replace('[MATH]', '')
+        clean_text = clean_text.replace('[/MATH]', '')
         
         # Replace pause markers with periods
         clean_text = clean_text.replace('[PAUSE]', '.')
