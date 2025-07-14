@@ -58,6 +58,14 @@ class TextEnhancer:
         
         # Comprehensive LaTeX to speech mappings for math teacher-style narration
         self.latex_to_speech = {
+            # Probability notation (MUST be processed first before general patterns)
+            r'\bP\(([^)]+)\)': r'probability of \g<1>',
+            r'\bE\[([^\]]+)\]': r'expected value of \g<1>',
+            r'\bVar\(([^)]+)\)': r'variance of \g<1>',
+            r'\bSD\(([^)]+)\)': r'standard deviation of \g<1>',
+            r'\bCov\(([^,]+),\s*([^)]+)\)': r'covariance of \g<1> and \g<2>',
+            r'\bCorr\(([^,]+),\s*([^)]+)\)': r'correlation of \g<1> and \g<2>',
+            
             # Complex fractions and nested structures
             r'\\frac\{([^{}]+)\}\{([^{}]+)\}': r'\g<1> over \g<2>',
             
@@ -447,10 +455,18 @@ class TextEnhancer:
         """Enhance chapter content for speech synthesis"""
         enhanced_content = content
         
-        # Process mathematical expressions
+        # Auto-wrap mathematical expressions FIRST (before processing known expressions)
+        enhanced_content = self._auto_wrap_mathematical_expressions(enhanced_content)
+        
+        # Process mathematical expressions (including newly wrapped ones)
         if self.enhancement_config.get('math_processing', {}).get('enabled', True):
+            # Re-extract math expressions after auto-wrapping to include new ones
+            from .markdown_processor import MarkdownProcessor
+            temp_processor = MarkdownProcessor({})
+            updated_math_expressions = temp_processor._extract_math_expressions(enhanced_content)
+            
             enhanced_content = self._process_math_expressions(
-                enhanced_content, doc_structure.math_expressions
+                enhanced_content, updated_math_expressions
             )
         
         # Process citations
@@ -772,9 +788,81 @@ class TextEnhancer:
         
         return enhanced_content
     
+    def _auto_wrap_mathematical_expressions(self, content: str) -> str:
+        """Intelligently detect mathematical expressions and wrap them in LaTeX delimiters"""
+        
+        # Split content by existing LaTeX expressions to avoid double-processing
+        parts = []
+        last_end = 0
+        
+        # Find all existing LaTeX expressions (both inline and block)
+        latex_pattern = re.compile(r'(\$\$.*?\$\$|\$.*?\$)', re.DOTALL)
+        
+        for match in latex_pattern.finditer(content):
+            # Add the text before this LaTeX expression
+            before_latex = content[last_end:match.start()]
+            if before_latex:
+                parts.append(('text', before_latex))
+            
+            # Add the LaTeX expression as-is
+            parts.append(('latex', match.group(0)))
+            last_end = match.end()
+        
+        # Add any remaining text after the last LaTeX expression
+        if last_end < len(content):
+            remaining = content[last_end:]
+            if remaining:
+                parts.append(('text', remaining))
+        
+        # If no LaTeX found, treat entire content as text
+        if not parts:
+            parts = [('text', content)]
+        
+        # Process only the text parts, leaving LaTeX parts unchanged
+        processed_parts = []
+        for part_type, part_content in parts:
+            if part_type == 'latex':
+                # Keep LaTeX expressions unchanged
+                processed_parts.append(part_content)
+            else:
+                # Auto-wrap mathematical expressions in text
+                processed_text = self._wrap_math_in_text(part_content)
+                processed_parts.append(processed_text)
+        
+        return ''.join(processed_parts)
+    
+    def _wrap_math_in_text(self, text: str) -> str:
+        """Wrap mathematical expressions found in plain text with LaTeX delimiters"""
+        
+        # Only process text that doesn't already contain LaTeX delimiters
+        # This prevents double-wrapping expressions that are already in LaTeX
+        if '$' in text:
+            # If there are dollar signs, this text segment might contain LaTeX
+            # Skip auto-wrapping to avoid conflicts
+            return text
+        
+        # Mathematical function notation: P(A), f(x), g(t), etc.
+        # Wrap in LaTeX so existing math processing handles them
+        text = re.sub(r'\b([A-Za-z])\(([^)]+)\)', r'$\g<1>(\g<2>)$', text)
+        
+        # Expected value notation: E[X]
+        text = re.sub(r'\bE\[([^\]]+)\]', r'$E[\g<1>]$', text)
+        
+        # Variance notation: Var(X)
+        text = re.sub(r'\bVar\(([^)]+)\)', r'$\\text{Var}(\g<1>)$', text)
+        
+        # Standard deviation: SD(X)
+        text = re.sub(r'\bSD\(([^)]+)\)', r'$\\text{SD}(\g<1>)$', text)
+        
+        # Set operations with symbols: A ∩ B, A ∪ B
+        text = re.sub(r'([A-Z])\s*∩\s*([A-Z])', r'$\g<1> \\cap \g<2>$', text)
+        text = re.sub(r'([A-Z])\s*∪\s*([A-Z])', r'$\g<1> \\cup \g<2>$', text)
+        
+        return text
+    
     def _optimize_for_speech(self, content: str) -> str:
         """Optimize text structure for natural speech"""
-        # Clean markdown formatting first
+        # Clean markdown formatting
         cleaned_content = self._clean_markdown_for_speech(content)
         
         # Split into sentences
