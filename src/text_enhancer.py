@@ -375,6 +375,38 @@ class TextEnhancer:
         
         return enhanced_title
     
+    def _clean_markdown_for_speech(self, content: str) -> str:
+        """Clean markdown formatting for natural speech conversion"""
+        cleaned = content
+        
+        # Remove markdown headers (hashtags) - Phase 1 fix
+        cleaned = re.sub(r'^#{1,6}\s+', '', cleaned, flags=re.MULTILINE)
+        
+        # Clean other markdown elements that affect speech
+        # Remove horizontal rules
+        cleaned = re.sub(r'^---+$', '', cleaned, flags=re.MULTILINE)
+        cleaned = re.sub(r'^\*\*\*+$', '', cleaned, flags=re.MULTILINE)
+        
+        # Remove blockquote markers but keep content
+        cleaned = re.sub(r'^>\s*', '', cleaned, flags=re.MULTILINE)
+        
+        # Remove list markers but keep content
+        cleaned = re.sub(r'^\s*[*+-]\s+', '', cleaned, flags=re.MULTILINE)  # Unordered lists
+        cleaned = re.sub(r'^\s*\d+\.\s+', '', cleaned, flags=re.MULTILINE)  # Ordered lists
+        
+        # Remove inline code backticks (keep content)
+        cleaned = re.sub(r'`([^`]+)`', r'\1', cleaned)
+        
+        # Remove links but keep text
+        cleaned = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', cleaned)  # [text](url)
+        cleaned = re.sub(r'\[([^\]]+)\]\[[^\]]*\]', r'\1', cleaned)      # [text][ref]
+        
+        # Clean up extra whitespace and empty lines
+        cleaned = re.sub(r'\n\s*\n', '\n', cleaned)  # Multiple newlines -> single
+        cleaned = ' '.join(cleaned.split())  # Normalize whitespace
+        
+        return cleaned
+    
     def _enhance_chapter_content(self, content: str, doc_structure: DocumentStructure) -> str:
         """Enhance chapter content for speech synthesis"""
         enhanced_content = content
@@ -706,8 +738,11 @@ class TextEnhancer:
     
     def _optimize_for_speech(self, content: str) -> str:
         """Optimize text structure for natural speech"""
+        # Clean markdown formatting first
+        cleaned_content = self._clean_markdown_for_speech(content)
+        
         # Split into sentences
-        sentences = re.split(r'[.!?]+', content)
+        sentences = re.split(r'[.!?]+', cleaned_content)
         optimized_sentences = []
         
         for sentence in sentences:
@@ -721,7 +756,7 @@ class TextEnhancer:
                 sentence = re.sub(r'\b(and|but|however|therefore|moreover|furthermore)\b', 
                                 r'[PAUSE] \g<1>', sentence)
             
-            # Add emphasis markers for important terms
+            # Add emphasis markers for important terms (already converted from markdown)
             sentence = re.sub(r'\*\*([^*]+)\*\*', r'[EMPHASIS] \g<1> [/EMPHASIS]', sentence)
             sentence = re.sub(r'\*([^*]+)\*', r'[SLIGHT_EMPHASIS] \g<1> [/SLIGHT_EMPHASIS]', sentence)
             

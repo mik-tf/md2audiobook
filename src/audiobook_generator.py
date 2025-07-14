@@ -354,6 +354,9 @@ class AudiobookGenerator:
         # Remove markdown formatting
         clean_text = text
         
+        # Remove markdown headers (fix hashtag reading issue)
+        clean_text = re.sub(r'^#{1,6}\s+', '', clean_text, flags=re.MULTILINE)
+        
         # Remove emphasis markers
         clean_text = clean_text.replace('[EMPHASIS]', '')
         clean_text = clean_text.replace('[/EMPHASIS]', '')
