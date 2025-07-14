@@ -190,7 +190,7 @@ class MarkdownProcessor:
         """Extract chapter structure from headers"""
         chapters = []
         lines = content.split('\n')
-        chapter_levels = self.markdown_config.get('chapter_levels', [2, 3])
+        chapter_levels = self.markdown_config.get('chapter_levels', [1, 2, 3, 4, 5, 6])
         
         current_chapters = {}  # Track chapters by level
         
@@ -201,12 +201,12 @@ class MarkdownProcessor:
                 title = header_match.group(2).strip()
                 
                 if level in chapter_levels:
-                    # Find chapter content (until next header of same or higher level)
+                    # Find chapter content (until next header of ANY level)
                     content_lines = []
                     j = i + 1
                     while j < len(lines):
                         next_header = re.match(r'^(#{1,6})\s+', lines[j])
-                        if next_header and len(next_header.group(1)) <= level:
+                        if next_header:  # Stop at ANY header
                             break
                         content_lines.append(lines[j])
                         j += 1

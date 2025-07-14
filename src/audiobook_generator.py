@@ -192,6 +192,7 @@ class AudiobookGenerator:
             }]
         
         chapters = []
+        
         for i, break_pos in enumerate(chapter_breaks):
             # Determine chapter boundaries
             start_pos = break_pos
@@ -297,8 +298,16 @@ class AudiobookGenerator:
             
             # Add the assigned segment
             segment_text = content[start_pos:end_pos]
-            pause_before = 2.0 if voice == 'chapter_voice' else 0
-            pause_after = 1.0 if voice == 'chapter_voice' else 0
+            # Smart pause assignment based on voice type (header level)
+            if voice in ['main_title_voice', 'chapter_voice']:
+                pause_before = 2.0  # Major titles need longer pause before
+                pause_after = 1.5   # And longer pause after
+            elif voice in ['section_voice', 'subsection_voice']:
+                pause_before = 1.0  # Sections need shorter pause before
+                pause_after = 0.8   # And shorter pause after
+            else:
+                pause_before = 0
+                pause_after = 0
             
             segments.append({
                 'text': segment_text,

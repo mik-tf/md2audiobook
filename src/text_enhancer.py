@@ -320,36 +320,72 @@ class TextEnhancer:
         chapter_titles = []
         current_position = 0
         
-        # Process each chapter
-        for chapter in doc_structure.chapters:
+        def _process_chapter_recursive(chapter, is_first=False):
+            """Recursively process chapter and all subsections"""
+            nonlocal current_position, enhanced_content, voice_assignments, pause_markers, chapter_titles, chapter_breaks
+            
             # Store original chapter title
             chapter_titles.append(chapter.title)
-            # Add chapter break marker
+            
+            # Add chapter break marker at current position
             chapter_breaks.append(current_position)
             
-            # Process chapter title
-            chapter_title = self._enhance_chapter_title(chapter.title)
+            # Add pause before heading (industry standard)
+            if not is_first:  # Not first chapter
+                pause_markers.append((current_position, 1.5))  # 1.5 second pause before heading
+            
+            # Process chapter title with level-aware enhancement
+            chapter_title = self._enhance_chapter_title(chapter.title, chapter.level)
             enhanced_content.append(chapter_title)
             
-            # Assign voice for chapter title
+            # Assign voice for chapter title based on level
             title_start = current_position
             title_end = current_position + len(chapter_title)
-            voice_assignments[f"{title_start}:{title_end}"] = "chapter_voice"
             
-            # Add pause after chapter title
+            # Smart voice assignment by header level
+            if chapter.level == 1:
+                voice_key = "main_title_voice"  # Main document title
+            elif chapter.level == 2:
+                voice_key = "chapter_voice"     # Major chapters
+            elif chapter.level == 3:
+                voice_key = "section_voice"     # Sections
+            else:
+                voice_key = "subsection_voice"  # Subsections (4+)
+            
+            voice_assignments[f"{title_start}:{title_end}"] = voice_key
             current_position = title_end
-            pause_markers.append((current_position, 2.0))  # 2 second pause
             
-            # Process chapter content
-            enhanced_chapter_content = self._enhance_chapter_content(
-                chapter.content, doc_structure
-            )
-            enhanced_content.append(enhanced_chapter_content)
+            # Add separator and pause after chapter title (industry standard)
+            separator = "\n\n"  # Clear separation between title and content
+            enhanced_content.append(separator)
+            current_position += len(separator)
+            pause_markers.append((current_position, 2.5))  # 2.5 second pause after heading
             
-            current_position += len(enhanced_chapter_content)
+            # Process chapter content (only immediate content, not subsection content)
+            if chapter.content.strip():  # Only if there's actual content
+                enhanced_chapter_content = self._enhance_chapter_content(
+                    chapter.content, doc_structure
+                )
+                enhanced_content.append(enhanced_chapter_content)
+                current_position += len(enhanced_chapter_content)
+            else:
+                # For chapters with no body content (like main title), ensure position advances
+                # so the title text becomes the content of this chapter segment
+                # The title and separator above already provide content for this chapter
+                pass  # Position is already at title_end + separator, which is correct
+            
+
+            
+            # Process all subsections recursively
+            for subsection in chapter.subsections:
+                _process_chapter_recursive(subsection, is_first=False)
         
-        # Combine all content
-        full_content = '\n\n'.join(enhanced_content)
+        # Process each chapter and subsections recursively
+        for i, chapter in enumerate(doc_structure.chapters):
+            _process_chapter_recursive(chapter, is_first=(i == 0))
+        
+        # Combine all content (separators already included)
+        full_content = ''.join(enhanced_content)
         
         # Apply global enhancements
         if self.processing_mode in ['local_ai', 'api', 'hybrid']:
@@ -364,10 +400,10 @@ class TextEnhancer:
             chapter_titles=chapter_titles
         )
     
-    def _enhance_chapter_title(self, title: str) -> str:
+    def _enhance_chapter_title(self, title: str, level: int = 2) -> str:
         """Enhance chapter title for speech"""
-        # Add emphasis markers for TTS
-        enhanced_title = f"Chapter: {title}"
+        # No prefixes - just use the title directly for all levels
+        enhanced_title = title
         
         # Apply pronunciation fixes
         for term, pronunciation in self.pronunciation_dict.items():
